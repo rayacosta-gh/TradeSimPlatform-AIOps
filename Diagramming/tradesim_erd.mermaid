@@ -1,0 +1,173 @@
+erDiagram
+    USER ||--o{ TRADING_AUTHORIZATION : "has"
+    TRADING_ENTITY ||--o{ TRADING_AUTHORIZATION : "grants access to"
+    TRADING_ENTITY ||--o{ TRADE : "owns position affected by"
+    USER ||--o{ TRADE : "executes"
+    TRADING_ENTITY ||--o{ POSITION : "holds"
+
+    TRADE ||--o{ TRADE_FLAG : "may be flagged by"
+    USER ||--o{ TRADE_FLAG : "manually flags (nullable)"
+
+    COMPLIANCE_INCIDENT ||--o{ INCIDENT_TRADE : "includes"
+    TRADE ||--o{ INCIDENT_TRADE : "included in"
+
+    COMPLIANCE_INCIDENT ||--o{ INCIDENT_TRADE_FLAG : "links"
+    TRADE_FLAG ||--o{ INCIDENT_TRADE_FLAG : "linked to"
+    USER ||--o{ INCIDENT_TRADE_FLAG : "links (linked_by)"
+
+    USER ||--o{ COMPLIANCE_INCIDENT : "opens"
+    TRADE ||--o{ COMPLIANCE_NOTE : "has"
+    COMPLIANCE_INCIDENT ||--o{ COMPLIANCE_NOTE : "contains (nullable)"
+    USER ||--o{ COMPLIANCE_NOTE : "writes"
+
+    USER ||--o{ ACCESS_GRANT : "grants (grantor)"
+    USER ||--o{ ACCESS_GRANT : "receives (grantee)"
+    COMPLIANCE_INCIDENT ||--o{ ACCESS_GRANT : "prompts (nullable)"
+    ACCESS_GRANT ||--o{ ACCESS_GRANT_AUDIT_LOG : "logs"
+
+    USER ||--o{ ADMIN_AUDIT_LOG : "performs (admin actions)"
+    USER ||--o{ AUDIT_EVENT : "performs (actor)"
+    USER ||--o{ LLM_INTERACTION_EVENT : "initiates"
+
+    USER {
+        uuid id PK
+        string email
+        string password_hash
+        string role
+        string department
+        string employee_id
+        string office
+        string country
+        string province_state
+        string city
+        timestamp created_at
+        timestamp revoked_at "nullable"
+    }
+
+    TRADING_ENTITY {
+        uuid id PK
+        string name
+        string type "individual, desk, group"
+    }
+
+    TRADING_AUTHORIZATION {
+        uuid user_id FK
+        uuid trading_entity_id FK
+        string role "owner, delegate"
+        timestamp granted_at
+        timestamp revoked_at "nullable"
+    }
+
+    TRADE {
+        uuid id PK
+        uuid order_id
+        uuid trading_entity_id FK
+        uuid executed_by FK "user_id"
+        string symbol
+        decimal quantity
+        string side "buy, sell"
+        decimal price
+        string order_type "market"
+        string status "submitted, filled, cancelled, rejected"
+        timestamp submitted_at
+        timestamp resolved_at "nullable"
+    }
+
+    POSITION {
+        uuid id PK
+        uuid trading_entity_id FK
+        string symbol
+        decimal quantity
+        decimal avg_cost "computed on read"
+    }
+
+    TRADE_FLAG {
+        uuid id PK
+        uuid trade_id FK
+        timestamp flagged_at
+        string flag_reason "size, frequency, pattern, manual"
+        uuid flagged_by FK "nullable, user_id"
+        string status "open, dismissed, escalated"
+    }
+
+    COMPLIANCE_INCIDENT {
+        uuid id PK
+        uuid opened_by FK "user_id"
+        timestamp opened_at
+        timestamp closed_at "nullable"
+        string status "open, closed"
+        text summary "nullable"
+    }
+
+    INCIDENT_TRADE {
+        uuid incident_id FK
+        uuid trade_id FK
+    }
+
+    INCIDENT_TRADE_FLAG {
+        uuid incident_id FK
+        uuid trade_flag_id FK
+        timestamp linked_at
+        uuid linked_by FK "user_id"
+        text relevance_note "nullable"
+    }
+
+    COMPLIANCE_NOTE {
+        uuid id PK
+        uuid trade_id FK
+        uuid incident_id FK "nullable"
+        uuid compliance_analyst_id FK "user_id"
+        text note_text
+        timestamp created_at
+    }
+
+    ACCESS_GRANT {
+        uuid id PK
+        uuid grantor_id FK "user_id, compliance analyst"
+        uuid grantee_id FK "user_id, admin"
+        uuid incident_id FK "nullable"
+        string scope "view-level for now"
+        timestamp granted_at
+        timestamp expires_at
+        timestamp revoked_at "nullable"
+        string status
+    }
+
+    ACCESS_GRANT_AUDIT_LOG {
+        uuid id PK
+        uuid access_grant_id FK
+        string action_type "granted, revoked, expired"
+        timestamp timestamp
+        json details
+    }
+
+    ADMIN_AUDIT_LOG {
+        uuid id PK
+        uuid admin_id FK "user_id"
+        string action_type
+        string target_type
+        uuid target_id
+        timestamp timestamp
+        json details
+    }
+
+    AUDIT_EVENT {
+        uuid id PK
+        uuid actor_id FK "user_id"
+        string action_type "trade status transitions, compliance note additions"
+        string target_type
+        uuid target_id
+        timestamp timestamp
+        json details
+    }
+
+    LLM_INTERACTION_EVENT {
+        uuid id PK
+        uuid user_id FK
+        string interaction_type "feature_request, bug_report, other"
+        text input_text
+        text classification_result
+        uuid github_issue_id "nullable"
+        timestamp timestamp
+        string accuracy_flag "nullable"
+    }
